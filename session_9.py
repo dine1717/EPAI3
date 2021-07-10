@@ -203,17 +203,6 @@ def get_average_age_dict(faker_db_dict):
     return sum(age)/count
 
 
-@timer_factory(100)
-def get_average_time(n, func, *args, **kwargs):
-    '''
-    this basically return the running time of the given function upto n times
-    '''
-    start = perf_counter()
-    for _ in range(n):
-        value = func(*args, **kwargs)
-    avg_run_time = (perf_counter() - start)/n
-    return avg_run_time
-
 
 def compare_time(nt_db, dict_db):
     """

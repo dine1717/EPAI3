@@ -1,261 +1,229 @@
-# Tuples and Named Tuples
 
-1. Use the Faker (Links to an external site.)library to get 10000 random profiles. Using namedtuple, calculate the largest blood type, mean-current_location, oldest_person_age, and average age (add proper doc-strings). - 250 (including 5 test cases)
-2. Do the same thing above using a dictionary. Prove that namedtuple is faster. - 250 (including 5 test cases)
-3. Create fake data (you can use Faker for company names) for imaginary stock exchange for top 100 companies (name, symbol, open, high, close). Assign a random weight to all the companies. Calculate and show what value the stock market started at, what was the highest value during the day, and where did it end. Make sure your open, high, close are not totally random. You can only use namedtuple. - 500  (including 10 test cases)
-4. Please write a readme file that can help me understand your code. If you don't write a readme properly, I would not be evaluating that piece of the code. 
-5. Add the notebook as well to your github where logs can be visible. Your github code must have cleared all the 20 tests that you're writing (these 20 cannot be any of the ones you can already find in the code we shared earlier).
+# S14 - Context Managers
 
 
-Solutions
+For this project you have 4 files containing information about persons.
 
-1. Generate 10000 random  profiles using named tuple.
+The files are:
 
-        def get_fake_profiles_nt(num):
+1. personal_info.csv - personal information such as name, gender, etc. (one row per person)
+2. vehicles.csv - what vehicle people own (one row per person)
+3. employment.csv - where a person is employed (one row per person)
+4. update_status.csv - when the person's data was created and last updated
+Each file contains a key, SSN, which uniquely identifies a person.
+
+This key is present in all four files.
+
+You are guaranteed that the same SSN value is present in every file, and that it only appears once per file.
+
+In addition, the files are all sorted by SSN, i.e. the SSN values appear in the same order in each file.
+
+
+#### Helper Functions for Converting the data types 
+
+        def get_datetime_object(date_time):
+            """Convert the datetime string to date time object"""
+            datetime_str = date_time
+            datetime_str = datetime_str[:10]+' '+datetime_str[11:-1]
+            return(datetime.strptime(datetime_str, '%Y-%m-%d %H:%M:%S'))
+
+        def cast_row(row,file_name):
+            """Function to cast the Row into proper data type"""
+            if file_name == 'vehicles.csv':
+                row[3] = int(row[3]) # Year
+            elif file_name == 'update_status.csv':
+                row[1] = get_datetime_object(row[1]) # last_update
+                row[2] = get_datetime_object(row[2]) # last_update
+            return row
+
+
+## Goal 1
+
+Your first task is to create iterators for each of the four files that contained cleaned up data, of the correct type (e.g. string, int, date, etc), and represented by a named tuple.
+
+For now these four iterators are just separate, independent iterators.
+
+
+###  1st Iterator for personal_info.csv
+
+        def read_personal_info(file_name):
+            """Generator to yield one row at a time from personal_info file as a named tuple"""
+            with open(file_name) as file:
+                dialect = csv.Sniffer().sniff(file.readline(), [',',';'])
+                file.seek(0)
+                rows = csv.reader(file, delimiter=dialect.delimiter, quotechar=dialect.quotechar)
+                headers = next(rows)
+                headers = (item.replace(" ", "_") for item in headers)
+                Personal_Info = namedtuple('Personal_Info', headers) # Create named tuple type
+                for row in rows:
+                    personal_info = Personal_Info(*row) # Create named tuple type
+                    yield personal_info
+
+### 2nd Iterator for vehicles.csv
+
+        def read_vehicles(file_name):
+            """Generator to yeild one row at a time from vechicles file as a named tuple"""
+            with open(file_name) as file:
+                dialect = csv.Sniffer().sniff(file.readline(), [',',';'])
+                file.seek(0)
+                rows = csv.reader(file, delimiter=dialect.delimiter, quotechar=dialect.quotechar)
+                headers = next(rows)
+                headers = (item.replace(" ", "_") for item in headers)
+                Vehicles = namedtuple('Vehicles', headers) # Create named tuple type
+                for row in rows:
+                    row = cast_row(row,file_name) # cast to the data types
+                    vehicles = Vehicles(*row) # Create named tuple type
+                    yield vehicles
+
+### 3rd Iterator for employment.csv
+        def read_employment(file_name):
+            """Generator to yeild one row at a time from employment file as a named tuple"""
+            with open(file_name) as file:
+                dialect = csv.Sniffer().sniff(file.readline(), [',',';'])
+                file.seek(0)
+                rows = csv.reader(file, delimiter=dialect.delimiter, quotechar=dialect.quotechar)
+                headers = next(rows)
+                headers = (item.replace(" ", "_") for item in headers)
+                Employment = namedtuple('Employment', headers) # Create named tuple type
+                for row in rows:
+                    row = cast_row(row,file_name) # cast to the data types
+                    employment_info = Employment(*row) # Create named tuple type
+                    yield employment_info
+
+### 4th Iterator for update_status.csv
+
+        def read_updated_status(file_name):
+            """Generator to yeild one row at a time from updated_status file as a named tuple"""
+            with open(file_name) as file:
+                dialect = csv.Sniffer().sniff(file.readline(), [',',';'])
+                file.seek(0)
+                rows = csv.reader(file, delimiter=dialect.delimiter, quotechar=dialect.quotechar)
+                headers = next(rows)
+                headers = (item.replace(" ", "_") for item in headers)
+                Status = namedtuple('Status', headers) # Create named tuple type
+                for row in rows:
+                    row = cast_row(row,file_name) # cast to the data types
+                    status_info = Status(*row) # Create named tuple type
+                    yield status_info
+
+
+## Goal 2
+
+Create a single iterable that combines all the columns from all the iterators.
+
+The iterable should yield named tuples containing all the columns. Make sure that the SSN's across the files match!
+
+All the files are guaranteed to be in SSN sort order, and every SSN is unique, and every SSN appears in every file.
+
+Make sure the SSN is not repeated 4 times - one time per row is enough!
+
+
+### Create a single iterable that combines all the columns from all the iterators.
+        def entire_information(f_personal_info,f_vehicles_info,f_emp_info,f_status):
             """
-            function to create fake profiles library
-            Generates a database of fake profiles
-            based on user input  using named tuples
-            It has one parameter:
-                1) num ->  int no. of fake profiles to be created
-
+            Yield combined information from personal_info, vechiles, employement and updates_status files
+            ('ssn', 'first_name', 'last_name', 'gender', 'language', 'vehicle_make', 'vehicle_model',
+            'model_year', 'employer', 'department', 'employee_id', 'last_updated', 'created')
             """
-            fake = Faker()
-            FakePrf= namedtuple('FakePrf', fake.profile().keys())
-            FakePrfDb = namedtuple('FakePrfDb', 'FakePrf_0')
+            file_list = [f_personal_info,f_vehicles_info,f_emp_info,f_status]
 
-            for i in range(num):
-                f_prfl = fake.profile()
-                fake_profile = FakePrf(**f_prfl)
-                if i==0:
-                    faker_db = FakePrfDb(fake_profile)
-                else:
-                    FakePrfDb = namedtuple('FakePrfDb', FakePrfDb._fields + ('FakePrf_'+str(i),))
-                    faker_db = FakePrfDb._make(faker_db + (fake_profile,))
+            # Get header Info
 
-            return(faker_db)
-  
- 1.1 Calculate the largest blood type
+            final_header=[]
+            for file in file_list:
+                with open(file) as f:
+                    dialect = csv.Sniffer().sniff(f.readline(), [',',';'])
+                    f.seek(0)
+                    rows = csv.reader(f, delimiter=dialect.delimiter, quotechar=dialect.quotechar)
+                    headers = next(rows)
+                    if file != 'personal_info.csv':
+                        headers = [item.replace(" ", "_") for item in headers]
+                        headers.remove('ssn')
+                        final_header += headers # only one SSN
+                    else:
+                        headers = [item.replace(" ", "_") for item in headers]
+                        final_header = headers
+            Total_Info = namedtuple('Total_Info', final_header) # Create named tuple type
 
-      def get_largest_blood_group(faker_db):
-          """
-          Return the most common blood group
-          of fake profile db as named tuple
-          It has one parameter:
-              1) faker_db ->  db of fake profiles (10000)
-          """
-          count = len(faker_db)
-          bl_grp = []
-          for i in range(count):
-              bl_grp.append(faker_db[i][5])
-          return Counter(bl_grp).most_common(1)[0][0]
-          
+            # Get information
+            per_info = read_personal_info(file_list[0])
+            vech_info = read_vehicles(file_list[1])
+            emp_info = read_employment(file_list[2])
+            status_info = read_updated_status(file_list[3])
 
-   
- 1.2 Mean-current_location
- 
-     def get_mean_current_location(faker_db):
-        """
-        Return the mean-current_location
-        of fake profile db as named tuple
-        It has one parameter:
-            1) faker_db ->  db of fake profiles (10000)
-        """
-        count = len(faker_db)
-        lat = []
-        long = []
-        for i in range(count):
-            lat.append(faker_db[i][4][0])
-            long.append(faker_db[i][4][1])
-        return sum(lat)/count,sum(long)/count
- 
- 1.3 Oldest_person_age
- 
-     def get_oldest_person_age(faker_db):
-        """
-        Return the oldest person's age
-        of fake profile db as named tuple
-        It has one parameter:
-            1) faker_db ->  db of fake profiles (10000)
-        """
-        size = len(faker_db)
-        age = []
-        days_in_year = 365.2425
-        today = datetime.date(datetime.today())
-        for i in range(size):
-            age.append((today - faker_db[i][12]).days / days_in_year)
-        return max(age)
-        
-  
-  1.4 Average Age 
-  
-        def get_average_age(faker_db):
-          """
-          Return the average age
-          of fake profile db as named tuple
-          It has one parameter:
-              1) faker_db ->  db of fake profiles (10000)
-          """
-          count = len(faker_db)
-          age = []
-          days_in_year = 365.2425
-          today = datetime.date(datetime.today())
-          for i in range(count):
-              age.append((today - faker_db[i][12]).days / days_in_year)
-          return sum(age)/count
+            for  i in per_info: # Considering all files are of same length, iterate over
+                info = next(per_info) + next(vech_info)[1:] + next(emp_info)[0:-1] + next(status_info)[1:]
+                total_info = Total_Info(*info)
 
-    
-    
-    
-  2. Generate 10000 random  profiles using dict.
+                yield total_info
+                
+                
+## Goal 3
 
-          def get_fake_profiles_dict(num):
-              """
-              function to create fake profiles library
-              Generates a database of fake profiles
-              based on user input  using dict
-              It has one parameter:
-                  1) num ->  int no. of fake profiles to be created
-              """
-              fake = Faker()
-              faker_db_dict = {}
+Next, you want to identify any stale records, where stale simply means the record has not been updated since 3/1/2017 (e.g. last update date < 3/1/2017). Create an iterator that only contains current records (i.e. not stale) based on the last_updated field from the status_update file.
+                
 
-              for i in range(num):
-                  f_prfl = fake.profile()
-                  key = 'fk_pr_' + str(i+1)
-                  faker_db_dict[key] = f_prfl
+### Create an iterator that only contains current records (i.e. not stale) based on the last_updated field from the status_update file.
 
-              return(faker_db_dict)
-  
- 2.1 Calculate the largest blood type
-
-    def get_largest_blood_group_dict(faker_db_dict):
-        """
-        Return the most common blood group for
-        fake profile db as dictionary
-        It has one parameter:
-            1) faker_db_dict ->  db of fake profiles (10000)
-        """
-        count = len(faker_db_dict)
-        bl_grp = []
-        for i in range(count):
-            key = 'fk_pr_' + str(i+1)
-            bl_grp.append(faker_db_dict[key]['blood_group'])
-        return Counter(bl_grp).most_common(1)[0][0]
-          
-
-   
- 2.2 Mean-current_location
- 
-    def get_mean_current_location_dict(faker_db_dict):
-        """
-        Return the mean-current_location
-        of fake profile db as dictionary
-        It has one parameter:
-            1) faker_db_dict ->  db of fake profiles (10000)
-        """
-        count = len(faker_db_dict)
-        lat = []
-        long = []
-        for i in range(count):
-            key = 'fk_pr_' + str(i+1)
-            lat.append(faker_db_dict[key]['current_location'][0])
-            long.append(faker_db_dict[key]['current_location'][1])
-        return sum(lat)/count,sum(long)/count
- 
- 2.3 Oldest_person_age
- 
-    def get_oldest_person_age_dict(faker_db_dict):
-        """
-        Return the oldest person's age
-        of fake profile db as dictionary
-        It has one parameter:
-            1) faker_db_dict ->  db of fake profiles (10000)
-        """
-        size = len(faker_db_dict)
-        age = []
-        days_in_year = 365.2425
-        today = datetime.date(datetime.today())
-        for i in range(size):
-            key = 'fk_pr_' + str(i+1)
-            age.append((today - faker_db_dict[key]['birthdate']).days / days_in_year)
-        return max(age)
-        
-  
-  2.4 Average Age 
-
-    def get_average_age_dict(faker_db_dict):
-        """
-        Return the average age
-        of fake profile db as dictionary
-        It has one parameter:
-            1) faker_db_dict ->  db of fake profiles (1000)
-        """
-        count = len(faker_db_dict)
-        age = []
-        days_in_year = 365.2425
-        today = datetime.date(datetime.today())
-        for i in range(count):
-            key = 'fk_pr_' + str(i+1)
-            age.append((today - faker_db_dict[key]['birthdate']).days / days_in_year)
-        return sum(age)/count
-
-
-
-3. Create fake data (you can use Faker for company names) for imaginary stock exchange for top 100 companies (name, symbol, open, high, close)
-
-
-        def create_stock_exchange(num_of_listed_comp = 100):
+        def latest_information(f_personal_info,f_vehicles_info,f_emp_info,f_status):
             """
-            function to create fake company profiles and list
-            them on a fake stock exchange.
+            Yield combined information latest from personal_info, vechiles, employement and updates_status files
+            ('ssn', 'first_name', 'last_name', 'gender', 'language', 'vehicle_make', 'vehicle_model',
+            'model_year', 'employer', 'department', 'employee_id', 'last_updated', 'created')
             """
-            Weights = namedtuple('Weights', ['wgt'+str(i) for i in range(num_of_listed_comp)])
-            weight = Weights(*[round(random.random(),2) for _ in range(num_of_listed_comp)])
-            wght_sum = sum(weight)
-            norm_weight = Weights(*[wght/wght_sum for wght in weight])
-            assert round(sum(norm_weight),2) == 1
+            file_list = [f_personal_info,f_vehicles_info,f_emp_info,f_status]
 
-            FakeComp = namedtuple('FakeComp', ['company_name', 'symbol', 'value', 'open', 'high', 'low', 'close'])
-            StkXchange = namedtuple('StkXchange', 'fake_comp_0')
-            fake = Faker()
+            # Get header Info
 
-          # Create fake companies and stock exchange
-          for i in range(num_of_listed_comp):
-              comp_name = fake.company()
-              symbol = comp_name[0].upper() + random.choice(re.sub('\W+','', comp_name[1:-1])).upper() + comp_name[-1].upper()
-              value = random.randint(3000,5000)
-              open_ = round(value*norm_weight[i],2)
-              high = round(open_*(random.randint(80,130)/100),2)
-              low = random.randint(math.floor(open_*100*.5),math.floor(high*100))/100
-              close = random.randint(math.floor(low*100),math.floor(high*100))/100
+            final_header=[]
+            for file in file_list:
+                with open(file) as f:
+                    dialect = csv.Sniffer().sniff(f.readline(), [',',';'])
+                    f.seek(0)
+                    rows = csv.reader(f, delimiter=dialect.delimiter, quotechar=dialect.quotechar)
+                    headers = next(rows)
+                    if file != 'personal_info.csv':
+                        headers = [item.replace(" ", "_") for item in headers]
+                        headers.remove('ssn')
+                        final_header += headers # only one SSN
+                    else:
+                        headers = [item.replace(" ", "_") for item in headers]
+                        final_header = headers
+            Total_Info = namedtuple('Total_Info', final_header) # Create named tuple type
 
-              # Create Fake Company
-              fake_comp = FakeComp(comp_name,symbol,value, open_,high,low,close)
-              # List the Fake company in Fake stock exchange
-              if i==0:
-                  stock_exchange = StkXchange(fake_comp)
-              else:
-                  StkXchange = namedtuple('StkXchange', StkXchange._fields + ('fake_comp_'+str(i),))
+            # Get information
+            per_info = read_personal_info(file_list[0])
+            vech_info = read_vehicles(file_list[1])
+            emp_info = read_employment(file_list[2])
+            status_info = read_updated_status(file_list[3])
 
-                  stock_exchange = StkXchange._make(stock_exchange + (fake_comp,))
+            for  i in per_info: # Considering all files are of same length, iterate over
+                info = next(per_info) + next(vech_info)[1:] + next(emp_info)[0:-1] + next(status_info)[1:]
+                total_info = Total_Info(*info)
+                if total_info.last_updated.date() > datetime.strptime('3/1/2017', '%m/%d/%Y').date(): # yield only current records
+                    yield total_info
 
-          return(stock_exchange)
+## Goal 4
 
-  3.1 Calculate the days open, low, high and closing for stock exchange
-  
-        def stock_exchange_details(stock_exchange):
+Find the largest group of car makes for each gender.
+
+Possibly more than one such group per gender exists (equal sizes).
+
+
+### Find the largest group of car makes for each gender.
+
+        def largest_group(f_personal_info,f_vehicles_info,f_emp_info,f_status,gender):
             """
-            Returns stock exchange details
+            Get the files and the gender type as input and return the largest groups for gender
             """
-            day_open=0
-            day_high=0
-            day_low=0
-            day_close=0
-            for i in range(100):
-                day_open  += stock_exchange[i].open
-                day_high  += stock_exchange[i].high
-                day_low   += stock_exchange[i].low
-                day_close += stock_exchange[i].close
 
-            return(round(day_open,2),round(day_high,2),round(day_low,2),round(day_close,2))
+            total_info = entire_information(f_personal_info,f_vehicles_info,f_emp_info,f_status)
+            info_list = (row.vehicle_make for row in total_info if row.gender == gender)
+            car_makers = Counter(info_list)
+
+            x = [v for v in car_makers.values()]
+
+            highest_value = max(x)
+            top_car_maker = [k for k,v in car_makers.items() if v == highest_value]
+
+            return top_car_maker
